@@ -72,8 +72,6 @@ def get_user_tweets(username):
 # Write an invocation to the function for the "umich" user timeline and save the result in a variable called umich_tweets:
 umich_tweets = get_user_tweets("umich")
 
-
-
 ## Task 2 - Creating database and loading data into database
 
 # You will be creating a database file: project3_tweets.db
@@ -109,46 +107,92 @@ conn = sqlite3.connect('project3_tweets.db')
 cur = conn.cursor()
 
 cur.execute('DROP TABLE IF EXISTS Tweets')
-cur.execute('CREATE TABLE Tweets (tweet_id INTEGER PRIMARY KEY, tweet TEXT, user_posted TEXT, time_posted TIMESTAMP, retweets INTEGER)')
+cur.execute('CREATE TABLE Tweets (tweet_id INTEGER PRIMARY KEY, tweet_text TEXT, user_id TEXT, time_posted TIMESTAMP, retweets INTEGER)')
+
+
+statement = 'INSERT OR IGNORE INTO Tweets VALUES (?, ?, ?, ?, ?)'
+
+for x in range(len(umich_tweets)):
+	tweet_id = umich_tweets[x]["id_str"]
+	tweet_text = umich_tweets[x]["text"]
+	user_id = umich_tweets[x]["user"]["id_str"]
+	time_posted = umich_tweets[x]["created_at"]
+	retweets = umich_tweets[x]["retweet_count"]
+
+	cur.execute(statement, (tweet_id, tweet_text, user_id, time_posted, retweets))
+
+conn.commit()
+
 
 cur.execute('DROP TABLE IF EXISTS Users')
 cur.execute('CREATE TABLE Users (user_id INTEGER PRIMARY KEY, screen_name TEXT, num_favs INTEGER, description TEXT)')
 
-statement = 'INSERT INTO Tweets VALUES (?, ?, ?, ?, ?)'
-
+user_id_list = []
 for x in range(len(umich_tweets)):
-	tweet_id = umich_tweets[x]["user"]["id"]
-	text = umich_tweets[x]["text"]
-	#user_posted =
-	#time_posted = 
-	retweets = umich_tweets[x]["retweet_count"]
+	for person in umich_tweets[x]["entities"]["user_mentions"]:
+		user_id_list.append(person["id_str"])
+
+screen_name_list = []
+for x in range(len(umich_tweets)):
+	for person in umich_tweets[x]["entities"]["user_mentions"]:
+		screen_name_list.append(person["screen_name"])
+
+num_favs_list = []
+for user in screen_name_list:
+	favs = api.favorites(user)
+	num_favs_list.append(len(favs))
+
+description_list = []
+for user in screen_name_list:
+	user_obj = api.get_user(user)
+	description_list.append(user_obj["description"])
+
+user_table_tuples = zip(user_id_list, screen_name_list, num_favs_list, description_list)
+
+user_table_list = list(user_table_tuples)
+
+statement = 'INSERT OR IGNORE INTO Users VALUES (?, ?, ?, ?)'
+
+for x in user_table_list:
+	cur.execute(statement, x)
+
+conn.commit()
 
 ## Task 3 - Making queries, saving data, fetching data
 
 # All of the following sub-tasks require writing SQL statements and executing them using Python.
 
 # Make a query to select all of the records in the Users database. Save the list of tuples in a variable called users_info.
+query = "SELECT * FROM Users"
+cur.execute(query)
+users_info = cur.fetchall()
 
 # Make a query to select all of the user screen names from the database. Save a resulting list of strings (NOT tuples, the strings inside them!) in the variable screen_names. HINT: a list comprehension will make this easier to complete!
-
+q2 = "SELECT screen_name FROM Users"
+cur.execute(q2)
+temp_tup = cur.fetchall()
+#screen_names = [name for names in temp_tup]
 
 # Make a query to select all of the tweets (full rows of tweet information) that have been retweeted more than 25 times. Save the result (a list of tuples, or an empty list) in a variable called more_than_25_rts.
-
+q3 = "SELECT * FROM Tweets WHERE retweets > 25"
+cur.execute(q3)
 
 
 # Make a query to select all the descriptions (descriptions only) of the users who have favorited more than 25 tweets. Access all those strings, and save them in a variable called descriptions_fav_users, which should ultimately be a list of strings.
-
-
+q4 = 'SELECT * FROM Users WHERE num_favs > 5'
+cur.execute(q4)
+descriptions_fav_users = cur.fetchall()
 
 # Make a query using an INNER JOIN to get a list of tuples with 2 elements in each tuple: the user screenname and the text of the tweet -- for each tweet that has been retweeted more than 50 times. Save the resulting list of tuples in a variable called joined_result.
-
+q5 = 'SELECT Users.screen_name, Tweets.tweet_text FROM Tweets INNER JOIN Users ON Tweets.user_id = Users.user_id WHERE Tweets.retweets > 5'
+cur.execute(q5)
 
 
 
 ## Task 4 - Manipulating data with comprehensions & libraries
 
 ## Use a set comprehension to get a set of all words (combinations of characters separated by whitespace) among the descriptions in the descriptions_fav_users list. Save the resulting set in a variable called description_words.
-
+description_words = {}
 
 
 ## Use a Counter in the collections library to find the most common character among all of the descriptions in the descriptions_fav_users list. Save that most common character in a variable called most_common_char. Break any tie alphabetically (but using a Counter will do a lot of work for you...).
